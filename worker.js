@@ -4,7 +4,7 @@ import * as dsp from './dsp.js'
 const bpm = 125
 const beats = 4
 
-self.onmessage = async ({ data: { methodName, sampleRate }}) => {
+self.onmessage = async ({ data: { methodName, sampleRate, samples }}) => {
   // math
   const beatTime = 1 / (bpm / 60)
   const blockTime = beats * beatTime
@@ -15,7 +15,7 @@ self.onmessage = async ({ data: { methodName, sampleRate }}) => {
   const floats = new Float32Array(buffer)
   let fn = dsp[methodName]
   if (fn.constructor.name === 'AsyncFunction') {
-    fn = await fn(settings)
+    fn = await fn({ ...settings, blockFrames }, samples)
   }
   for (let i = 0, sample = 0; i < blockFrames; i++) {
     // TODO: rolling buffer time

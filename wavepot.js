@@ -13,8 +13,25 @@ let prev = {}
 async function setup () {
   const reg = await navigator.serviceWorker.register('./sw.js', { scope: '/' })
 
+  reg.onupdatefound = () => {
+    const sw = reg.installing
+    sw.onstatechange = () => {
+      console.log('service worker installed - reloading')
+      location.reload()
+    }
+  }
+
+  if (localStorage.inited === "true") {
+    const script = await (await fetch('./dsp.js')).text()
+    editor.getDoc().setValue(script)
+  }
+
   editor.setOption('extraKeys', { // TODO: prevent messing with editor before sw
-    'Ctrl-S': cm => playScript(cm.getDoc().getValue())
+    'Ctrl-S': cm => playScript(cm.getDoc().getValue()),
+    'Ctrl-Enter': cm => {
+      Object.keys(prev).forEach(key => prev[key].stop())
+      prev = {}
+    }
   })
 
   startCanvas()
@@ -41,12 +58,19 @@ async function startCanvas () {
   canvasWorker.postMessage({ offscreenCanvas }, [offscreenCanvas])
 }
 
+const samples = []
+
 async function playScript (script) {
   console.log("_,-'``'-,_,.-'``") //.-'``'-.,_,.-'``'-.,_,.-")
 
   if (!audioContext) {
     audioContext = window.audioContext = new AudioContext()
     console.log(`start audio: ${audioContext.sampleRate}hz`)
+
+    const sample = (await audioContext.decodeAudioData(
+      await (await fetch('./samples/RAW_DDT_JAK_D.wav')).arrayBuffer()
+    )).getChannelData(0)
+    samples.push(sample)
   }
 
   const settings = {
@@ -57,6 +81,8 @@ async function playScript (script) {
   await saveToCache('./dsp.js', script)
   const exported = await readExports()
 
+  localStorage.inited = "true"
+
   dspFunctions = []
   const actions = Object.entries(exported).map(async ([key, value]) => {
     switch (value) {
@@ -65,7 +91,7 @@ async function playScript (script) {
         dspFunctions.push(key)
         const label = `${key}`
         console.time(label)
-        const rendered = await renderBuffer(key)
+        const rendered = await renderBuffer(key, samples)
         const syncTime = calcSyncTime(rendered)
         if (prev[key]) prev[key].stop(syncTime)
         const source = prev[key] = audioContext.createBufferSource()
@@ -108,12 +134,12 @@ async function readExports () {
   }).then(({ data }) => (worker.terminate(), data))
 }
 
-async function renderBuffer (methodName) {
+async function renderBuffer (methodName, samples) {
   const worker = new Worker('./worker.js', { type: 'module' })
   return new Promise((resolve, reject) => {
     worker.onmessage = resolve
     worker.onerror = reject
-    worker.postMessage({ methodName, sampleRate: audioContext.sampleRate })
+    worker.postMessage({ methodName, sampleRate: audioContext.sampleRate, samples })
   }).then(({ data }) => (worker.terminate(), data))
 }
 
