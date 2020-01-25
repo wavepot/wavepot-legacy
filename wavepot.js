@@ -147,7 +147,7 @@ async function renderBuffer (methodName) {
       // console.log('message', data)
       if (data.fetch) {
         const sample = samples[data.fetch] || (await audioContext.decodeAudioData(
-          await (await fetch(encodeURIComponent(data.fetch))).arrayBuffer()
+          await (await fetch(data.fetch.split('/').slice(1,-1).join('/') + '/' + encodeURIComponent(data.fetch.split('/').pop()))).arrayBuffer()
         )).getChannelData(0) //'./samples/RAW_DDT_JAK_D.wav'
         samples[data.fetch] = sample
         worker.postMessage({ fetched: { url: data.fetch, sample }})
