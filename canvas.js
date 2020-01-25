@@ -18,6 +18,8 @@ self.onmessage = ({ data }) => {
     'c','x','S','C','T','R',
     'a','b','d','e','f','g','h','i','j','k','l','m',
     'n','o','p','q','r','s','u','v','w','y','z',
+    'A','B','D','E','F','G','H','I','J','K','L',
+    'M','N','L','O','P','Q','U','V','W','X','Y','Z',
     `return ${source}`
   )(
     canvas,

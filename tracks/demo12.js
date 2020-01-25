@@ -1,45 +1,6 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>wavepot</title>
-    <link rel="stylesheet" href="./codemirror/lib/codemirror.css">
-    <link rel="stylesheet" href="./codemirror/addon/display/fullscreen.css">
-    <link rel="stylesheet" href="./codemirror/addon/scroll/simplescrollbars.css">
-    <link rel="stylesheet" href="./codemirror/addon/lint/lint.css">
-    <link rel="stylesheet" href="./codemirror/theme/night.css">
-    <!-- <link rel="stylesheet" href="./jazz.css"> -->
-    <link rel="stylesheet" href="./wavepot.css">
-    <link rel="icon" href="./favicon.ico">
-  </head>
-  <body>
-    <textarea id="editor" autofocus style="display:none">
+
 /**
- * wavepot <3
- *
- * -=- work in progress ;) -=-
- *
- * we are using cutting edge technologies!
- * for it to work, you need to type in the url chrome://flags
- * and enable "Experimental Web Platform features",
- * "Experimental JavaScript", "Future VM features" and
- * "WebAssembly threads support".
- * this will hopefully not be needed in the near future
- * when Chrome releases these into the stable channel
- *
- * uncomment things and edit values below to begin playing
- * ctrl+s saves and plays - ctrl+enter stops
- * go on! hit ctrl+s now!
- * visuals are dwitter.net dweets, copy&paste should work
- * changes are saved locally and preserved in browser cache
- * clear cache or ctrl+z to get back to this initial setup here
- * btw, this is not a sandbox! code below is executed natively
- * in a browser worker - imports work and you can fetch things
- * proper saving and lots more coming up in the near future
- * follow the development here https://github.com/wavepot/wavepot/tree/v3
- * share the love and keep scripting <3
- *
- * enjoy :^)
+ * test
  */
 
 import clip from './lib/softclip/index.js'
@@ -282,9 +243,3 @@ export var draw = t => {
   x.strokeStyle='rgba(255,255,255,1)';
   x.fillRect(0,0,b,b);x.beginPath();for(i=b*.2;i--;)x.lineTo(i/2*C(t)+i*S(g=t+i)+960,i/4*S(t)+i*C(g)+540);x.stroke()
 }
-</textarea>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.11.0/jshint.min.js"></script>
-    <!-- <script src="./jazz.js"></script> -->
-    <script src="./wavepot.js" type="module"></script>
-  </body>
-</html>
