@@ -29,7 +29,10 @@ async function setup () {
   editor.setOption('extraKeys', { // TODO: prevent messing with editor before sw
     'Ctrl-S': cm => playScript(cm.getDoc().getValue()),
     'Ctrl-Enter': cm => {
-      Object.keys(prev).forEach(key => prev[key].stop())
+      Object.keys(prev).forEach(key => {
+        prev[key].stop()
+        prev[key].worker.terminate()
+      })
       prev = {}
     }
   })
@@ -102,14 +105,6 @@ async function playScript (script) {
         const label = `${key}`
         console.time(label)
         const rendered = await renderBuffer(key)
-        const syncTime = calcSyncTime(rendered)
-        if (prev[key]) prev[key].stop(syncTime)
-        const source = prev[key] = audioContext.createBufferSource()
-        source.loop = true
-        source.buffer = audioContext.createBuffer(1, rendered.blockFrames, audioContext.sampleRate)
-        source.buffer.getChannelData(0).set(new Float32Array(rendered.buffer))
-        source.connect(audioContext.destination)
-        source.start(syncTime)
         console.timeEnd(label)
         break
       case 'String': // TODO: ?
@@ -147,8 +142,9 @@ async function readExports () {
 async function renderBuffer (methodName) {
   const worker = new Worker('./worker.js', { type: 'module' })
   return new Promise((resolve, reject) => {
+    let resolved = false
     worker.onmessage = async ({ data }) => {
-      console.log('message,', data)
+      // console.log('message', data)
       if (data.fetch) {
         const sample = samples[data.fetch] || (await audioContext.decodeAudioData(
           await (await fetch(encodeURIComponent(data.fetch))).arrayBuffer()
@@ -156,16 +152,38 @@ async function renderBuffer (methodName) {
         samples[data.fetch] = sample
         worker.postMessage({ fetched: { url: data.fetch, sample }})
       } else {
-        resolve({ data })
+        const key = methodName
+        const syncTime = calcSyncTime(data)
+        if (prev[key]) {
+          if (!resolved) prev[key].worker.terminate()
+          prev[key].stop(syncTime)
+        }
+        const source = prev[key] = audioContext.createBufferSource()
+        source.n = data.n
+        source.worker = worker
+        source.loop = true
+        source.buffer = audioContext.createBuffer(1, data.blockFrames, audioContext.sampleRate)
+        source.buffer.getChannelData(0).set(new Float32Array(data.buffer))
+        source.connect(audioContext.destination)
+        source.start(syncTime)
+
+        if (!resolved) {
+          resolved = true
+          resolve({ data })
+        }
+
+        // TODO: workaround for loops, remove this
+        if (key === 'loops') {
+          worker.terminate()
+        }
       }
     }
     worker.onerror = reject
-    worker.postMessage({ methodName, sampleRate: audioContext.sampleRate })
-  }).then(({ data }) => (worker.terminate(), data))
+    worker.postMessage({ methodName, sampleRate: audioContext.sampleRate, n: prev[methodName] ? prev[methodName].n : 0 })
+  }) //.then(({ data }) => (worker.terminate(), data))
 }
 
 function calcSyncTime (rendered) {
-  console.log(rendered)
   return normalize(
     audioContext.currentTime +
     (rendered.blockTime -
