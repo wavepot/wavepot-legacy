@@ -15,7 +15,7 @@ self.onmessage = async ({ data: { methodName, sampleRate }}) => {
   }
 
   // math
-  const beatTime = 1 / (bpm / 60)
+  const beatTime = 60 / bpm
   const blockTime = beats * beatTime
   const beatFrames = sampleRate * beatTime - ((sampleRate * beatTime) % Float32Array.BYTES_PER_ELEMENT)
   const blockFrames = beatFrames * beats // TODO: subtract here?- ((beatFrames * beats) % 4) // TODO: multiple of 4?
@@ -24,7 +24,7 @@ self.onmessage = async ({ data: { methodName, sampleRate }}) => {
   const floats = new Float32Array(buffer)
   let fn = dsp[methodName]
   if (fn.constructor.name === 'AsyncFunction') {
-    fn = await fn({ ...settings, blockFrames })
+    fn = await fn({ blockFrames })
   }
   for (let i = 0, sample = 0; i < blockFrames; i++) {
     // TODO: rolling buffer time
