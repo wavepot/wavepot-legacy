@@ -21,6 +21,8 @@ async function setup () {
     }
   }
 
+  reg.update()
+
   if (localStorage.inited === "true") {
     const script = await (await fetch('./dsp.js')).text()
     editor.getDoc().setValue(script)
