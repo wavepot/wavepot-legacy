@@ -58,7 +58,7 @@ async function startCanvas () {
   canvasWorker.postMessage({ offscreenCanvas }, [offscreenCanvas])
 }
 
-const samples = []
+const samples = {}
 
 async function playScript (script) {
   console.log("_,-'``'-,_,.-'``") //.-'``'-.,_,.-'``'-.,_,.-")
@@ -66,18 +66,28 @@ async function playScript (script) {
   if (!audioContext) {
     audioContext = window.audioContext = new AudioContext()
     console.log(`start audio: ${audioContext.sampleRate}hz`)
-
-    const sample = (await audioContext.decodeAudioData(
-      await (await fetch('./samples/RAW_DDT_JAK_D.wav')).arrayBuffer()
-    )).getChannelData(0)
-    samples.push(sample)
   }
 
+  // math
   const settings = {
-    bpm: 60,
+    bpm: 125,
     sampleRate: audioContext.sampleRate
   }
-  await saveToCache('./settings.js', `export var bpm = ${settings.bpm}; export var sampleRate = ${settings.sampleRate}`)
+  settings.beats = 4
+  settings.beatTime = 1 / (settings.bpm / 60)
+  settings.blockTime = settings.beats * settings.beatTime
+  settings.beatFrames = settings.sampleRate * settings.beatTime - ((settings.sampleRate * settings.beatTime) % Float32Array.BYTES_PER_ELEMENT)
+  settings.blockFrames = settings.beatFrames * settings.beats // TODO: subtract here?- ((beatFrames * beats) % 4) // TODO: multiple of 4?
+
+  await saveToCache('./settings.js', `
+    export var bpm = ${settings.bpm}
+    export var sampleRate = ${settings.sampleRate}
+    export var beats = ${settings.beats}
+    export var beatTime = ${settings.beatTime}
+    export var blockTime = ${settings.blockTime}
+    export var beatFrames = ${settings.beatFrames}
+    export var blockFrames = ${settings.blockFrames}
+  `)
   await saveToCache('./dsp.js', script)
   const exported = await readExports()
 
@@ -91,7 +101,7 @@ async function playScript (script) {
         dspFunctions.push(key)
         const label = `${key}`
         console.time(label)
-        const rendered = await renderBuffer(key, samples)
+        const rendered = await renderBuffer(key)
         const syncTime = calcSyncTime(rendered)
         if (prev[key]) prev[key].stop(syncTime)
         const source = prev[key] = audioContext.createBufferSource()
@@ -134,16 +144,28 @@ async function readExports () {
   }).then(({ data }) => (worker.terminate(), data))
 }
 
-async function renderBuffer (methodName, samples) {
+async function renderBuffer (methodName) {
   const worker = new Worker('./worker.js', { type: 'module' })
   return new Promise((resolve, reject) => {
-    worker.onmessage = resolve
+    worker.onmessage = async ({ data }) => {
+      console.log('message,', data)
+      if (data.fetch) {
+        const sample = samples[data.fetch] || (await audioContext.decodeAudioData(
+          await (await fetch(encodeURIComponent(data.fetch))).arrayBuffer()
+        )).getChannelData(0) //'./samples/RAW_DDT_JAK_D.wav'
+        samples[data.fetch] = sample
+        worker.postMessage({ fetched: { url: data.fetch, sample }})
+      } else {
+        resolve({ data })
+      }
+    }
     worker.onerror = reject
-    worker.postMessage({ methodName, sampleRate: audioContext.sampleRate, samples })
+    worker.postMessage({ methodName, sampleRate: audioContext.sampleRate })
   }).then(({ data }) => (worker.terminate(), data))
 }
 
 function calcSyncTime (rendered) {
+  console.log(rendered)
   return normalize(
     audioContext.currentTime +
     (rendered.blockTime -

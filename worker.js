@@ -4,7 +4,16 @@ import * as dsp from './dsp.js'
 const bpm = 125
 const beats = 4
 
-self.onmessage = async ({ data: { methodName, sampleRate, samples }}) => {
+self.onfetch = {}
+
+self.onmessage = async ({ data: { methodName, sampleRate }}) => {
+  // this is decodedAudio from the main thread
+  // used in conjuction with lib/fetch-sample.js
+  // TODO: handle this in a cleaner way
+  self.onmessage = ({ data: { fetched }}) => {
+    self.onfetch[fetched.url](fetched.sample)
+  }
+
   // math
   const beatTime = 1 / (bpm / 60)
   const blockTime = beats * beatTime
@@ -15,7 +24,7 @@ self.onmessage = async ({ data: { methodName, sampleRate, samples }}) => {
   const floats = new Float32Array(buffer)
   let fn = dsp[methodName]
   if (fn.constructor.name === 'AsyncFunction') {
-    fn = await fn({ ...settings, blockFrames }, samples)
+    fn = await fn({ ...settings, blockFrames })
   }
   for (let i = 0, sample = 0; i < blockFrames; i++) {
     // TODO: rolling buffer time
