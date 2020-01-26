@@ -45,18 +45,18 @@ import { beatFrames, blockFrames } from './settings.js'
 import rand from './lib/seedable-random.js'
 
 export default async () => {
-  rand.seed(1111)
+  rand.seed(555)
 
   var nopop = Nopop(.07,.001)
 
-  var notes = scales['minor blues']
-    .map(n => n + (2 + (rand()*3|0) * 12))
+  var notes = scales['spanish']
+    .map(n => n + (2 + (rand()*4|0) * 12))
 
   var notesHz = notes.map(note)
 
   var chorder = await Chorder({
     notes, reverse: true,
-    osc: Saw, params: [256, true],
+    osc: Tri, params: [256, true],
     octave: 3, speed: 1
   })
   // var chorder2 = await Chorder({ scale: 'mixolydian', reverse: true, osc: Saw, octave: 1, speed: 8, notes: 1 })
@@ -69,22 +69,22 @@ export default async () => {
   var biquad2 = new Biquad('bpf')
   var biquad3 = new Biquad('lpf')
 
-  var bassOsc = Saw(255)
-  // var bassOsc = Sqr(50)
+  // var bassOsc = Saw(255)
+  var bassOsc = Sqr(50)
 
   var sd = 1111
   var beats1 = await Beats({ seed: sd, images: [
     // [sd+3,'base',4,0,.4],
     // [sd+123,'base',8,0,.6],
     // [114011,'base',4,0,.6],
-    [123,'base',4,0,.4],
+    // [123,'base',4,0,.4],
     // [333,'base',4,0,1],
 
     // [333,'highs',4,0,.7],
     // [111,'highs',4,0,.7],
-    // [222,'highs',4,0,.7],
+    [222,'highs',4,0,.7],
 
-    // [101010,'snare',1,0,.4],
+    [101010,'snare',1,0,.4],
     // [333,'snare',1,0,.7],
 
     // [445,'texture',2,0,.7],
@@ -92,7 +92,7 @@ export default async () => {
 
     // [223,'snare',4,.2,.7],
     // [sd+44423,'snare',1,0,.7],
-    // [222,'snare',1,0,.7],
+    [222,'snare',1,0,.7],
     // [555,'snare',1,0,.7],
 
     // [333,'tonal',4,0,.6],
@@ -112,41 +112,41 @@ export default async () => {
     keys = perc(t/4%(1/8), 10, keys)
     keys = keys - biquad1.cut(500).res(3).gain(3).update().run(keys)
 
-    var bass = bassOsc(slide(t/2, 1/16, 33, notesHz.map(n => n*2)))
+    var bass = bassOsc(slide(t/2, 1/16, 3, notesHz.map(n => n*2)))
     bass = bass * perc(t%(1/4),40,25) * .17
     bass = diode
       .cut(2.10 *
        perc((t+(1/2))%(1.5),
-       1,.06) // magic
-     + sin(t, 4)*.006 // magic
-     + (sin(t, .01)+1) *.20
+       1.2,.08) // magic
+     + sin(t, 4)*.007 // magic
+     + (sin(t, .01)+1) *.10
        )
-      .hpf(.00014)
+      .hpf(.00019)
       .res(.82)
       .run(bass*2) //* //perc(t%(1/4),2,30) * .52
 
     bass = clip(bass, .62) // more magic
     var out = (0
-      + clip(kick * 1.7, 1)*.4
-      + .8 * keys
-      + 0.3 * bass
+      + clip(kick * 1.7, 1)*1
+      // + .8 * keys
+      + 0.25 * bass
       + .5 * beats1(t, f % blockFrames)
     )
 
     // eq
-    out = out - biquad2.cut(400).res(3).gain(3).update().run(out)*.3
+    // out = out - biquad2.cut(400).res(3).gain(3).update().run(out)*.3
     out = out - biquad3.cut(300).res(2).gain(3).update().run(out)*.5
 
     return (
       nopop(out*.35)
-      // delay.feedback(.69).delay(beatFrames/200).run(out, 0.7)
+      // delay.feedback(.69).delay(beatFrames/200).run(out, 0.5)
     )
   }
 }
 
 export var draw = t => {
   // dna
-  for(i=0;i<1100;i++){d=C(t+1*i),s=i==0?2920:9-d*20;x.fillStyle=R(i,i,i,0.1);x.fillRect(S(t*2.5+3*i)*280*S(C(t)+i%50)+960*(i==0?-1:1),i,s,s);};x.fillStyle='transparent'
+  // for(i=0;i<1100;i++){d=C(t+1*i),s=i==0?2920:9-d*20;x.fillStyle=R(i,i,i,0.1);x.fillRect(S(t*2.5+3*i)*280*S(C(t)+i%50)+960*(i==0?-1:1),i,s,s);};x.fillStyle='transparent'
 
   // fire
   // x.fillRect(0,0,b=2e3,b);for(d=i=999;i--;x.fillRect(e=i%40*50+99*S(i/t)-99,(a=(i*i-t*(99+i%60))%d),a*a/b,50))x.fillStyle=R(i%255,i%150,0,.01)
@@ -257,8 +257,8 @@ export var draw = t => {
   // w=1920;g=s=>0.5+S(t*s)/2;b=`C${'🤓'.repeat(g(5)*40+2)}L`;x.font=g(5)*99+99+'px s';x.fillText(b,g(2)*(w-x.measureText(b).width),480)
 
   // spiral
-  // A=960,B=540,x.clearRect(0,0,D=2e3,D);x.fillStyle='#fff';
-  // for(i=D;i--;)x.fillRect(A+1/(Z=2.5+C(p=i*C(t/2)/40)*S(q=i/628))*(X=S(p)*S(q))*A,B+C(q)/Z*A,s=69/Z/Z,s)
+  A=960,B=540,x.clearRect(0,0,D=2e3,D);x.fillStyle='#f0f';
+  for(i=D;i--;)x.fillRect(A+1/(Z=2.5+C(p=i*C(t/2)/40)*S(q=i/628))*(X=S(p)*S(q))*A,B+C(q)/Z*A,s=69/Z/Z,s)
 
   // psy spiral
   // x.clearRect(0,0,1920,1080)

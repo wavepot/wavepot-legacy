@@ -45,19 +45,19 @@ import { beatFrames, blockFrames } from './settings.js'
 import rand from './lib/seedable-random.js'
 
 export default async () => {
-  rand.seed(1111)
+  rand.seed(72323777)
 
   var nopop = Nopop(.07,.001)
 
   var notes = scales['minor blues']
-    .map(n => n + (2 + (rand()*3|0) * 12))
+    .map(n => n + (0 + (rand()*3|0) * 12))
 
   var notesHz = notes.map(note)
 
   var chorder = await Chorder({
     notes, reverse: true,
-    osc: Saw, params: [256, true],
-    octave: 3, speed: 1
+    osc: Saw, params: [256, true], voices: 1,
+    octave: 2, speed: 1/4
   })
   // var chorder2 = await Chorder({ scale: 'mixolydian', reverse: true, osc: Saw, octave: 1, speed: 8, notes: 1 })
   var lpf = Moog('half')
@@ -77,18 +77,22 @@ export default async () => {
     // [sd+3,'base',4,0,.4],
     // [sd+123,'base',8,0,.6],
     // [114011,'base',4,0,.6],
-    [123,'base',4,0,.4],
+    // [123,'base',4,0,.4],
     // [333,'base',4,0,1],
+    // [88,'base',4,0,3],
 
     // [333,'highs',4,0,.7],
     // [111,'highs',4,0,.7],
-    // [222,'highs',4,0,.7],
+    [222,'highs',4,0,.6],
 
-    // [101010,'snare',1,0,.4],
-    // [333,'snare',1,0,.7],
+    // [101010,'snare',1,0,2],
+    // [666,'snare',4,0,1],
+    [333,'snare',1,0,1.7],
+    // [77777,'snare',1,0,1.7],
 
     // [445,'texture',2,0,.7],
     // [222,'texture',2,0,.7],
+    // [666,'texture',4,0,2],
 
     // [223,'snare',4,.2,.7],
     // [sd+44423,'snare',1,0,.7],
@@ -96,50 +100,52 @@ export default async () => {
     // [555,'snare',1,0,.7],
 
     // [333,'tonal',4,0,.6],
-    [444,'tonal',4,0,.4],
+    // [444,'tonal',4,0,.4],
+    // [7777,'tonal',2,0,1.6], //!!
   ] })
 
-
   return (t, f) => {
+    // t*=4;f*=4
     var kick = arp(t, 1/4, 52, 50, 8)
 
     var keys = chorder(t)
     keys = lpf
-      .cut(400 + perc(t%(1/4), 15, 300) + -lfo(1)*200)
-      .res(0.75)
+      .cut(1000 + perc(t%(1/16), 150, 30) + -lfo(1)*200)
+      .res(0.55)
       .sat(0.8)
       .update().run(keys)
     keys = perc(t/4%(1/8), 10, keys)
-    keys = keys - biquad1.cut(500).res(3).gain(3).update().run(keys)
+    keys = keys + biquad1.cut(500).res(3).gain(3).update().run(keys)
 
-    var bass = bassOsc(slide(t/2, 1/16, 33, notesHz.map(n => n*2)))
+    var bass = bassOsc(slide(t/4, 1/16, 3, notesHz.map(n => n*8)))
     bass = bass * perc(t%(1/4),40,25) * .17
     bass = diode
-      .cut(2.10 *
-       perc((t+(1/2))%(1.5),
-       1,.06) // magic
-     + sin(t, 4)*.006 // magic
+      .cut(2.20 *
+       perc((t+(0))%(1/4),
+       1.7,.22) // magic
+     + sin(t, 4)*.002 // magic
      + (sin(t, .01)+1) *.20
+     + (sin(t, 4)+1) *.05
        )
-      .hpf(.00014)
-      .res(.82)
-      .run(bass*2) //* //perc(t%(1/4),2,30) * .52
+      .hpf(.00015)
+      .res(.58)
+      .run(bass*5) //* //perc(t%(1/4),2,30) * .52
 
-    bass = clip(bass, .62) // more magic
+    bass = clip(bass, .42)*.5 // more magic
     var out = (0
-      + clip(kick * 1.7, 1)*.4
-      + .8 * keys
+      + clip(kick * 2, .5)*.7
+      + .25 * keys
       + 0.3 * bass
-      + .5 * beats1(t, f % blockFrames)
+      + .2 * beats1(t, f % blockFrames)
     )
 
     // eq
-    out = out - biquad2.cut(400).res(3).gain(3).update().run(out)*.3
-    out = out - biquad3.cut(300).res(2).gain(3).update().run(out)*.5
+    out = out - biquad2.cut(400).res(3).gain(3).update().run(out)*.4
+    out = out - biquad3.cut(300).res(2).gain(3).update().run(out)*.6
 
     return (
       nopop(out*.35)
-      // delay.feedback(.69).delay(beatFrames/200).run(out, 0.7)
+      // delay.feedback(.69).delay(beatFrames/200).run(out, 0.5) * .5
     )
   }
 }
@@ -257,7 +263,7 @@ export var draw = t => {
   // w=1920;g=s=>0.5+S(t*s)/2;b=`C${'🤓'.repeat(g(5)*40+2)}L`;x.font=g(5)*99+99+'px s';x.fillText(b,g(2)*(w-x.measureText(b).width),480)
 
   // spiral
-  // A=960,B=540,x.clearRect(0,0,D=2e3,D);x.fillStyle='#fff';
+  // A=960,B=540,x.clearRect(0,0,D=2e3,D);x.fillStyle='#f0f';
   // for(i=D;i--;)x.fillRect(A+1/(Z=2.5+C(p=i*C(t/2)/40)*S(q=i/628))*(X=S(p)*S(q))*A,B+C(q)/Z*A,s=69/Z/Z,s)
 
   // psy spiral
@@ -270,6 +276,6 @@ export var draw = t => {
   // spiral tunnel
   // x.clearRect(0,0,1920,1080);
   // x.fillStyle=R(b=2e3,b,b,0.01);
-  // x.strokeStyle='rgba(255,255,255,1)';
+  // x.strokeStyle='rgba(255,0,0,1)';
   // x.fillRect(0,0,b,b);x.beginPath();for(i=b*.2;i--;)x.lineTo(i/2*C(t)+i*S(g=t+i)+960,i/4*S(t)+i*C(g)+540);x.stroke()
 }

@@ -77,15 +77,15 @@ export default async () => {
     // [sd+3,'base',4,0,.4],
     // [sd+123,'base',8,0,.6],
     // [114011,'base',4,0,.6],
-    [123,'base',4,0,.4],
+    // [123,'base',4,0,.4],
     // [333,'base',4,0,1],
 
     // [333,'highs',4,0,.7],
-    // [111,'highs',4,0,.7],
+    [111,'highs',4,0,.7],
     // [222,'highs',4,0,.7],
 
     // [101010,'snare',1,0,.4],
-    // [333,'snare',1,0,.7],
+    [333,'snare',1,0,.7],
 
     // [445,'texture',2,0,.7],
     // [222,'texture',2,0,.7],
@@ -117,7 +117,7 @@ export default async () => {
     bass = diode
       .cut(2.10 *
        perc((t+(1/2))%(1.5),
-       1,.06) // magic
+       1,.09) // magic
      + sin(t, 4)*.006 // magic
      + (sin(t, .01)+1) *.20
        )
@@ -126,20 +126,27 @@ export default async () => {
       .run(bass*2) //* //perc(t%(1/4),2,30) * .52
 
     bass = clip(bass, .62) // more magic
+
+    var xx = arp(t, 2, 120, 10, 2) * clip(Math.sin((f>>4^(f>>2)^Math.exp(f>>4)-1^8)%4*f / 130), .6) * .4
+    var yy = arp(t, 1/2, 120, 10, 2) * clip(Math.sin((f>>9^(f>>2)^Math.exp(f>>2)-1^4)%2*f / 50), .6) * .4
+
     var out = (0
-      + clip(kick * 1.7, 1)*.4
+      // + clip(kick * 1.7, 1)*.4
       + .8 * keys
-      + 0.3 * bass
-      + .5 * beats1(t, f % blockFrames)
+      + .2 * xx
+      + .12 * yy
+      // + 0.4 * bass
+      // + Math.sin(120 * t)*0.2
+      // + .5 * beats1(t, f % blockFrames)
     )
 
     // eq
-    out = out - biquad2.cut(400).res(3).gain(3).update().run(out)*.3
-    out = out - biquad3.cut(300).res(2).gain(3).update().run(out)*.5
+    // out = out - biquad2.cut(400).res(3).gain(3).update().run(out)*.3
+    out = out - biquad3.cut(300).res(2).gain(3).update().run(out)*.3
 
     return (
       nopop(out*.35)
-      // delay.feedback(.69).delay(beatFrames/200).run(out, 0.7)
+      // delay.feedback(.69).delay(beatFrames/200).run(out, 0.4)
     )
   }
 }
@@ -273,3 +280,4 @@ export var draw = t => {
   // x.strokeStyle='rgba(255,255,255,1)';
   // x.fillRect(0,0,b,b);x.beginPath();for(i=b*.2;i--;)x.lineTo(i/2*C(t)+i*S(g=t+i)+960,i/4*S(t)+i*C(g)+540);x.stroke()
 }
+

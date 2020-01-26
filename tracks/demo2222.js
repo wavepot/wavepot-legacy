@@ -45,19 +45,19 @@ import { beatFrames, blockFrames } from './settings.js'
 import rand from './lib/seedable-random.js'
 
 export default async () => {
-  rand.seed(1111)
+  rand.seed(7234411)
 
   var nopop = Nopop(.07,.001)
 
   var notes = scales['minor blues']
-    .map(n => n + (2 + (rand()*3|0) * 12))
+    .map(n => n + (5 + (rand()*2|0) * 12))
 
   var notesHz = notes.map(note)
 
   var chorder = await Chorder({
     notes, reverse: true,
     osc: Saw, params: [256, true],
-    octave: 3, speed: 1
+    octave: 3, speed: 8
   })
   // var chorder2 = await Chorder({ scale: 'mixolydian', reverse: true, osc: Saw, octave: 1, speed: 8, notes: 1 })
   var lpf = Moog('half')
@@ -76,77 +76,85 @@ export default async () => {
   var beats1 = await Beats({ seed: sd, images: [
     // [sd+3,'base',4,0,.4],
     // [sd+123,'base',8,0,.6],
-    // [114011,'base',4,0,.6],
-    [123,'base',4,0,.4],
+    [114011,'base',4,0,.6],
+    // [123,'base',4,0,.4],
     // [333,'base',4,0,1],
+    // [88,'base',4,0,3],
 
-    // [333,'highs',4,0,.7],
-    // [111,'highs',4,0,.7],
-    // [222,'highs',4,0,.7],
+    // [333,'highs',4,0,2.7],
+    [111,'highs',4,0,1.7],
+    // [222,'highs',4,0,1.56],
 
-    // [101010,'snare',1,0,.4],
-    // [333,'snare',1,0,.7],
+    // [101010,'snare',1,0,2],
+    // [666,'snare',4,0,1],
+    [333,'snare',1,0,1.7],
+    // [77777,'snare',1,0,1.7],
 
     // [445,'texture',2,0,.7],
     // [222,'texture',2,0,.7],
+    // [666,'texture',4,0,2],
 
     // [223,'snare',4,.2,.7],
     // [sd+44423,'snare',1,0,.7],
-    // [222,'snare',1,0,.7],
-    // [555,'snare',1,0,.7],
+    // [222,'snare',1,0,1.7],
+    // [555,'snare',1,0,1.2],
+    // [55555,'snare',1,0,1.2],
 
     // [333,'tonal',4,0,.6],
-    [444,'tonal',4,0,.4],
+    // [444,'tonal',4,0,.4],
+    // [7777,'tonal',2,0,2.2], //!!
   ] })
 
 
   return (t, f) => {
+    // t*=4;//f*=1.02
     var kick = arp(t, 1/4, 52, 50, 8)
 
     var keys = chorder(t)
     keys = lpf
-      .cut(400 + perc(t%(1/4), 15, 300) + -lfo(1)*200)
-      .res(0.75)
-      .sat(0.8)
+      .cut(1200 + perc(t%(1/16), 150, 30) + -lfo(1)*200)
+      .res(0.35)
+      .sat(0.6)
       .update().run(keys)
-    keys = perc(t/4%(1/8), 10, keys)
-    keys = keys - biquad1.cut(500).res(3).gain(3).update().run(keys)
+    keys = perc(t/4%(1/32), 10, keys)
+    keys = keys + biquad1.cut(800).res(1).gain(3).update().run(keys)
 
-    var bass = bassOsc(slide(t/2, 1/16, 33, notesHz.map(n => n*2)))
+    var bass = bassOsc(slide(t/2, 1/2, 3, notesHz.map(n => n*2)))
     bass = bass * perc(t%(1/4),40,25) * .17
     bass = diode
-      .cut(2.10 *
-       perc((t+(1/2))%(1.5),
-       1,.06) // magic
-     + sin(t, 4)*.006 // magic
-     + (sin(t, .01)+1) *.20
+      .cut(1.55 *
+       perc((t+(1))%(2.5),
+       .7,.13) // magic
+     + sin(t, 8)*.007 // magic
+     + (sin(t, .03)+1) *.10
+     + (sin(t, 4)+1) *.05
        )
-      .hpf(.00014)
-      .res(.82)
+      .hpf(.00028)
+      .res(.92)
       .run(bass*2) //* //perc(t%(1/4),2,30) * .52
 
     bass = clip(bass, .62) // more magic
     var out = (0
-      + clip(kick * 1.7, 1)*.4
-      + .8 * keys
-      + 0.3 * bass
-      + .5 * beats1(t, f % blockFrames)
+      + clip(kick * 2.5, .5)*.7
+      // + .5 * keys
+      + 0.35 * bass
+      + .35 * beats1(t, f % blockFrames)
     )
 
     // eq
-    out = out - biquad2.cut(400).res(3).gain(3).update().run(out)*.3
-    out = out - biquad3.cut(300).res(2).gain(3).update().run(out)*.5
+    out = out - biquad2.cut(200).res(3).gain(3).update().run(out)*.3
+    out = out - biquad3.cut(300).res(2).gain(3).update().run(out)*.6
 
     return (
-      nopop(out*.35)
-      // delay.feedback(.69).delay(beatFrames/200).run(out, 0.7)
+      nopop(out*.3)
+      // delay.feedback(.69).delay(beatFrames/200).run(out, 0.5) * .5
     )
   }
 }
 
 export var draw = t => {
   // dna
-  for(i=0;i<1100;i++){d=C(t+1*i),s=i==0?2920:9-d*20;x.fillStyle=R(i,i,i,0.1);x.fillRect(S(t*2.5+3*i)*280*S(C(t)+i%50)+960*(i==0?-1:1),i,s,s);};x.fillStyle='transparent'
+  // for(i=0;i<1100;i++){d=C(t+1*i),s=i==0?2920:9-d*20;x.fillStyle=R(i,i,i,0.1);x.fillRect(S(t*2.5+3*i)*280*S(C(t)+i%50)+960*(i==0?-1:1),i,s,s);};x.fillStyle='transparent'
 
   // fire
   // x.fillRect(0,0,b=2e3,b);for(d=i=999;i--;x.fillRect(e=i%40*50+99*S(i/t)-99,(a=(i*i-t*(99+i%60))%d),a*a/b,50))x.fillStyle=R(i%255,i%150,0,.01)
@@ -171,8 +179,8 @@ export var draw = t => {
   // x.fillRect(0,0,i=w=c.width,w);x.fillStyle="rgba(255,255,255,1)";for(;i--;)j=t*99,z=w*99/(i-j%1),a=i+j-j%1,x.fillRect(C(a*a)*z+1e3,C(a*w)*z+500,w/i,w/i);x.fillStyle='transparent'
 
   // weird rope
-  // x.fillStyle='black';x.fillRect(0,0,1920,1080);
-  // x.fillStyle='#fff';for(X=i=0;i++<1e3;x.fillRect(960+950*X,540+530*Y,9,9))Y=X,X=S(X+S(i)-t);
+  x.fillStyle='black';x.fillRect(0,0,1920,1080);
+  x.fillStyle='#fff';for(X=i=0;i++<1e3;x.fillRect(960+950*X,540+530*Y,9,9))Y=X,X=S(X+S(i)-t);
 
   // weird dots
   // x.fillStyle='black';x.fillRect(0,0,1920,1080);
@@ -191,13 +199,13 @@ export var draw = t => {
 //   for(i=2e3;i--;)x.fillRect(880+560*S(d=i/92)*S(b=2.79*i+t),270+160*(C(d)+T(t/9+d)),s=7/(S(d)*C(b)+2),s)
 
 //   // banana
-//   x.fillStyle='yellow'
-//   for(i=d=1920;j=i--/d;x.fillStyle=R(d+i,d/j,x.arc(99+(i-79)*S(T(t)),S(3*j+S(t*7)/3)*705,j>.9?5:200*S(3*j+.3),0,7),x.fill()))x.beginPath()
+  x.fillStyle='yellow'
+  for(i=d=1920;j=i--/d;x.fillStyle=R(d+i,d/j,x.arc(99+(i-79)*S(T(t)),S(3*j+S(t*7)/3)*705,j>.9?5:200*S(3*j+.3),0,7),x.fill()))x.beginPath()
 
   // reflection
-  // x.fillRect(C(t/5)*960+960,S(t)*270+270,9,9)
-  // x.clearRect(0,h=540,2e3,h)
-  // for(i=544;i-=8;)x.drawImage(c,0,h-i,2e3,8,0,h+i*(S(i+t)/9+1),2e3,8)
+  x.fillRect(C(t/5)*960+960,S(t)*270+270,9,9)
+  x.clearRect(0,h=540,2e3,h)
+  for(i=544;i-=8;)x.drawImage(c,0,h-i,2e3,8,0,h+i*(S(i+t)/9+1),2e3,8)
 
   // chess
   // for(i=0;i<23;i++)g=250*((5*t+i|0)%2),x.fillStyle=R(g,g,g,1),x.fillRect(80*i,5,80,20);x.drawImage(c,-5,5,1930,1080+5*S(t));
@@ -257,7 +265,7 @@ export var draw = t => {
   // w=1920;g=s=>0.5+S(t*s)/2;b=`C${'🤓'.repeat(g(5)*40+2)}L`;x.font=g(5)*99+99+'px s';x.fillText(b,g(2)*(w-x.measureText(b).width),480)
 
   // spiral
-  // A=960,B=540,x.clearRect(0,0,D=2e3,D);x.fillStyle='#fff';
+  // A=960,B=540,x.clearRect(0,0,D=2e3,D);x.fillStyle='#f0f';
   // for(i=D;i--;)x.fillRect(A+1/(Z=2.5+C(p=i*C(t/2)/40)*S(q=i/628))*(X=S(p)*S(q))*A,B+C(q)/Z*A,s=69/Z/Z,s)
 
   // psy spiral
@@ -270,6 +278,6 @@ export var draw = t => {
   // spiral tunnel
   // x.clearRect(0,0,1920,1080);
   // x.fillStyle=R(b=2e3,b,b,0.01);
-  // x.strokeStyle='rgba(255,255,255,1)';
+  // x.strokeStyle='rgba(255,0,0,1)';
   // x.fillRect(0,0,b,b);x.beginPath();for(i=b*.2;i--;)x.lineTo(i/2*C(t)+i*S(g=t+i)+960,i/4*S(t)+i*C(g)+540);x.stroke()
 }

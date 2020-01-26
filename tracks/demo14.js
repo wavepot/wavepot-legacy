@@ -49,15 +49,15 @@ export default async () => {
 
   var nopop = Nopop(.07,.001)
 
-  var notes = scales['minor blues']
-    .map(n => n + (2 + (rand()*3|0) * 12))
+  var notes = scales['minor']
+    .map(n => n + (5 + (rand()*2|0) * 12))
 
   var notesHz = notes.map(note)
 
   var chorder = await Chorder({
     notes, reverse: true,
-    osc: Saw, params: [256, true],
-    octave: 3, speed: 1
+    osc: Tri, params: [256, true],
+    octave: 4, speed: 1
   })
   // var chorder2 = await Chorder({ scale: 'mixolydian', reverse: true, osc: Saw, octave: 1, speed: 8, notes: 1 })
   var lpf = Moog('half')
@@ -77,15 +77,15 @@ export default async () => {
     // [sd+3,'base',4,0,.4],
     // [sd+123,'base',8,0,.6],
     // [114011,'base',4,0,.6],
-    [123,'base',4,0,.4],
+    // [123,'base',4,0,.4],
     // [333,'base',4,0,1],
 
     // [333,'highs',4,0,.7],
-    // [111,'highs',4,0,.7],
+    [111,'highs',4,0,.7],
     // [222,'highs',4,0,.7],
 
     // [101010,'snare',1,0,.4],
-    // [333,'snare',1,0,.7],
+    [333,'snare',1,0,.7],
 
     // [445,'texture',2,0,.7],
     // [222,'texture',2,0,.7],
@@ -101,23 +101,24 @@ export default async () => {
 
 
   return (t, f) => {
+    t/=4
     var kick = arp(t, 1/4, 52, 50, 8)
 
     var keys = chorder(t)
     keys = lpf
-      .cut(400 + perc(t%(1/4), 15, 300) + -lfo(1)*200)
+      .cut(800 + perc(t%(1/4), 15, 300) + -lfo(.01)*400)
       .res(0.75)
       .sat(0.8)
       .update().run(keys)
     keys = perc(t/4%(1/8), 10, keys)
-    keys = keys - biquad1.cut(500).res(3).gain(3).update().run(keys)
+    keys = keys - biquad1.cut(2500).res(4).gain(3).update().run(keys)
 
-    var bass = bassOsc(slide(t/2, 1/16, 33, notesHz.map(n => n*2)))
+    var bass = bassOsc(slide(t/4, 1/16, 33, notesHz.map(n => n*2)))
     bass = bass * perc(t%(1/4),40,25) * .17
     bass = diode
       .cut(2.10 *
        perc((t+(1/2))%(1.5),
-       1,.06) // magic
+       1,.09) // magic
      + sin(t, 4)*.006 // magic
      + (sin(t, .01)+1) *.20
        )
@@ -126,30 +127,39 @@ export default async () => {
       .run(bass*2) //* //perc(t%(1/4),2,30) * .52
 
     bass = clip(bass, .62) // more magic
+
+    var xx = arp(t, 2, 120, 10, 2) * clip(Math.sin((f>>4^(f>>2)^Math.exp(f>>4)-1^8)%4*f / 130), .6) * .4
+    var yy = arp(t, 1/2, 120, 10, 2) * clip(Math.sin((f>>9^(f>>2)^Math.exp(f>>2)-1^4)%2*f / 50), .6) * .4
+
     var out = (0
-      + clip(kick * 1.7, 1)*.4
+      + clip(kick * 1.7, 1)*.8
       + .8 * keys
-      + 0.3 * bass
-      + .5 * beats1(t, f % blockFrames)
+      + .4 * xx
+      // + .12 * yy
+      // + 0.4 * bass
+      // + Math.sin(120 * t)*0.2
+      // + .5 * beats1(t, f % blockFrames)
     )
 
     // eq
-    out = out - biquad2.cut(400).res(3).gain(3).update().run(out)*.3
-    out = out - biquad3.cut(300).res(2).gain(3).update().run(out)*.5
+    // out = out - biquad2.cut(400).res(3).gain(3).update().run(out)*.3
+    out = out - biquad3.cut(300).res(2).gain(3).update().run(out)*.3
+
+    out = delay.feedback(.49).delay(beatFrames/2).run(out, 0.4)
 
     return (
       nopop(out*.35)
-      // delay.feedback(.69).delay(beatFrames/200).run(out, 0.7)
+      // delay.feedback(.69).delay(beatFrames/200).run(out, 0.4)
     )
   }
 }
 
 export var draw = t => {
   // dna
-  for(i=0;i<1100;i++){d=C(t+1*i),s=i==0?2920:9-d*20;x.fillStyle=R(i,i,i,0.1);x.fillRect(S(t*2.5+3*i)*280*S(C(t)+i%50)+960*(i==0?-1:1),i,s,s);};x.fillStyle='transparent'
+  // for(i=0;i<1100;i++){d=C(t+1*i),s=i==0?2920:9-d*20;x.fillStyle=R(i,i,i,0.1);x.fillRect(S(t*2.5+3*i)*280*S(C(t)+i%50)+960*(i==0?-1:1),i,s,s);};x.fillStyle='transparent'
 
   // fire
-  // x.fillRect(0,0,b=2e3,b);for(d=i=999;i--;x.fillRect(e=i%40*50+99*S(i/t)-99,(a=(i*i-t*(99+i%60))%d),a*a/b,50))x.fillStyle=R(i%255,i%150,0,.01)
+  x.fillRect(0,0,b=2e3,b);for(d=i=999;i--;x.fillRect(e=i%40*50+99*S(i/t)-99,(a=(i*i-t*(99+i%60))%d),a*a/b,50))x.fillStyle=R(i%255,i%150,0,.01)
 
   // spin disc
   // x.fillStyle='white';for(i=0;i<300;i++)for(j=0;j<6;j++){x.fillRect(960+200*C(i)*S(T(t/1.1)+j/i),540+200*S(i),10,10)};x.fillStyle='transparent'
@@ -273,3 +283,4 @@ export var draw = t => {
   // x.strokeStyle='rgba(255,255,255,1)';
   // x.fillRect(0,0,b,b);x.beginPath();for(i=b*.2;i--;)x.lineTo(i/2*C(t)+i*S(g=t+i)+960,i/4*S(t)+i*C(g)+540);x.stroke()
 }
+
