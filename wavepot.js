@@ -1,5 +1,8 @@
 import { editor } from './editor.js'
+import Oscilloscope from './lib/oscilloscope.js'
 // import './jazz-editor.js'
+
+let plots = []
 
 let canvas, canvasWorker
 
@@ -144,6 +147,8 @@ async function readExports () {
 async function renderBuffer (methodName) {
   const worker = new Worker('./worker.js', { type: 'module' })
   return new Promise((resolve, reject) => {
+    plots.forEach(p => p.widget.clear())
+    plots = []
     let resolved = false
     worker.onmessage = async ({ data }) => {
       // console.log('message', data)
@@ -153,6 +158,20 @@ async function renderBuffer (methodName) {
         )).getChannelData(0) //'./samples/RAW_DDT_JAK_D.wav'
         samples[data.fetch] = sample
         worker.postMessage({ fetched: { url: data.fetch, sample }})
+      } else if (data.plot) {
+        const os = new Oscilloscope({ ...data.plot.opts, height: editor.defaultTextHeight() })
+        plots.push(data.plot)
+        data.plot.os = os
+        os.render(new Float32Array(data.plot.buffer))
+        os.event = () => {
+          plots.forEach(p => {
+            p.os.zoom = os.zoom
+            p.os.render()
+          })
+        }
+        const line = editor.getLineHandle(data.plot.pos.line)
+        os.el.style.left = editor.charCoords({ line: data.plot.pos.line, ch: line.text.length }).left + 2 + 'px'
+        data.plot.widget = editor.addLineWidget(data.plot.pos.line, os.el, { above: true, coverGutter: true })
       } else {
         const key = methodName
         const syncTime = calcSyncTime(data)
