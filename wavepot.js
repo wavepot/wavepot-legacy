@@ -1,10 +1,13 @@
 import { editor } from './editor.js'
+import MIDI from './lib/webmidi/index.js'
 import Oscilloscope from './lib/oscilloscope.js'
 // import './jazz-editor.js'
 
 let plots = []
 
 let canvas, canvasWorker
+
+let CC
 
 // AudioContext initializes after user gesture
 let audioContext
@@ -15,6 +18,8 @@ let prev = {}
 //TODO: ^^ improve this - merge dspFunctions/prev?
 
 async function setup () {
+  CC = await MIDI()
+
   const reg = await navigator.serviceWorker.register('./sw.js', { scope: '/' })
 
   reg.onupdatefound = () => {
@@ -165,6 +170,7 @@ async function renderBuffer (methodName) {
     // otherwise clicks will be audible
     // new AudioWorkletNode(audioContext, 'DSP', { processorOptions: { n } }
     audioWorkletNode = new AudioWorkletNode(audioContext, `DSP${audioWorkletProcessorId}`)
+    audioWorkletNode.port.postMessage({ buffer: CC.buffer })
     if (prevNode) {
       prevNode.port.postMessage('terminate')
       prevNode.disconnect()

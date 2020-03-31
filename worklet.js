@@ -10,6 +10,7 @@ let fn = dsp['live'] || (() => (0))
 
 let n = 0
 let flag = true
+let CC = new Int8Array(128).fill(0)
 
 async function init () {
   if (fn.constructor.name === 'AsyncFunction') {
@@ -18,13 +19,17 @@ async function init () {
   }
 
   class DSP extends AudioWorkletProcessor {
-    constructor (...args) {
-      super(...args)
+    constructor (options) {
+      super(options)
 
       this.port.onmessage = e => {
+        console.log(e)
         if (e.data === 'terminate') {
           flag = false
           console.log('should terminate worklet')
+        } else if (e.data.buffer) {
+          CC = new Int8Array(e.data.buffer)
+          console.log('got buffer', CC)
         }
       }
     }
@@ -33,7 +38,7 @@ async function init () {
       let sample = 0
       const channel = outputs[0][0]
       for (let i = 0; i < channel.length; i++, n++) {
-        sample = fn(1 + n / settings.sampleRate)
+        sample = fn(1 + n / settings.sampleRate, CC)
         channel[i] = normalize(sample)
       }
       return flag
