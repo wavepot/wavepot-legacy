@@ -2,6 +2,8 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return
 
   if (!event.request.url.includes('dsp.js')
+    && !event.request.url.includes('DSP')
+    && !event.request.url.includes('worklet')
     && !event.request.url.includes('settings.js')) return
 
   // respondWith needs to be called synchronously

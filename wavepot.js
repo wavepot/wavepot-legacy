@@ -8,6 +8,7 @@ let canvas, canvasWorker
 
 // AudioContext initializes after user gesture
 let audioContext
+let audioWorkletNode, audioWorkletProcessorId = -1, workletScript
 let dspFunctions = []
 // previous source
 let prev = {}
@@ -31,9 +32,16 @@ async function setup () {
     editor.getDoc().setValue(script)
   }
 
+  workletScript = await (await fetch('./worklet.js')).text()
+
   editor.setOption('extraKeys', { // TODO: prevent messing with editor before sw
     'Ctrl-S': cm => playScript(cm.getDoc().getValue()),
     'Ctrl-Enter': cm => {
+      if (audioWorkletNode) {
+        audioWorkletNode.port.postMessage('terminate')
+        audioWorkletNode.disconnect()
+        audioWorkletNode = null // gc
+      }
       Object.keys(prev).forEach(key => {
         prev[key].stop()
         prev[key].worker.terminate()
@@ -42,7 +50,7 @@ async function setup () {
     }
   })
 
-  startCanvas()
+  // startCanvas()
 }
 
 async function saveToCache (filename, content) {
@@ -72,7 +80,7 @@ async function playScript (script) {
   console.log("_,-'``'-,_,.-'``") //.-'``'-.,_,.-'``'-.,_,.-")
 
   if (!audioContext) {
-    audioContext = window.audioContext = new AudioContext()
+    audioContext = window.audioContext = new AudioContext({ latencyHint: 'playback' })
     console.log(`start audio: ${audioContext.sampleRate}hz`)
   }
 
@@ -97,6 +105,8 @@ async function playScript (script) {
     export var blockFrames = ${settings.blockFrames}
   `)
   await saveToCache('./dsp.js', script)
+  await saveToCache(`./DSP${++audioWorkletProcessorId}.js`, script)
+  await saveToCache(`./worklet${audioWorkletProcessorId}.js`, workletScript.replace(/DSP/g, `DSP${audioWorkletProcessorId}`))
   const exported = await readExports()
 
   localStorage.inited = "true"
@@ -145,63 +155,82 @@ async function readExports () {
 }
 
 async function renderBuffer (methodName) {
-  const worker = new Worker('./worker.js', { type: 'module' })
-  return new Promise((resolve, reject) => {
-    plots.forEach(p => p.widget.clear())
-    plots = []
-    let resolved = false
-    worker.onmessage = async ({ data }) => {
-      // console.log('message', data)
-      if (data.fetch) {
-        const sample = samples[data.fetch] || (await audioContext.decodeAudioData(
-          await (await fetch(data.fetch.split('/').slice(1,-1).join('/') + '/' + encodeURIComponent(data.fetch.split('/').pop()))).arrayBuffer()
-        )).getChannelData(0) //'./samples/RAW_DDT_JAK_D.wav'
-        samples[data.fetch] = sample
-        worker.postMessage({ fetched: { url: data.fetch, sample }})
-      } else if (data.plot) {
-        const os = new Oscilloscope({ ...data.plot.opts, height: editor.defaultTextHeight() })
-        plots.push(data.plot)
-        data.plot.os = os
-        os.render(new Float32Array(data.plot.buffer))
-        os.event = () => {
-          plots.forEach(p => {
-            p.os.zoom = os.zoom
-            p.os.render()
-          })
-        }
-        const line = editor.getLineHandle(data.plot.pos.line)
-        os.el.style.left = editor.charCoords({ line: data.plot.pos.line, ch: line.text.length }).left + 2 + 'px'
-        data.plot.widget = editor.addLineWidget(data.plot.pos.line, os.el, { above: true, coverGutter: true })
-      } else {
-        const key = methodName
-        const syncTime = calcSyncTime(data)
-        if (prev[key]) {
-          if (!resolved) prev[key].worker.terminate()
-          prev[key].stop(syncTime)
-        }
-        const source = prev[key] = audioContext.createBufferSource()
-        source.n = data.n
-        source.worker = worker
-        source.loop = true
-        source.buffer = audioContext.createBuffer(1, data.blockFrames, audioContext.sampleRate)
-        source.buffer.getChannelData(0).set(new Float32Array(data.buffer))
-        source.connect(audioContext.destination)
-        source.start(syncTime)
+  // audioworklet dsp
+  if (methodName === 'live') {
+    console.log(`should load module worklet${audioWorkletProcessorId}.js`)
+    await audioContext.audioWorklet.addModule(`./worklet${audioWorkletProcessorId}.js`)
+    let prevNode = audioWorkletNode
+    // TODO: pass time parameter (n) to node
+    // for proper alignment of waveforms
+    // otherwise clicks will be audible
+    // new AudioWorkletNode(audioContext, 'DSP', { processorOptions: { n } }
+    audioWorkletNode = new AudioWorkletNode(audioContext, `DSP${audioWorkletProcessorId}`)
+    if (prevNode) {
+      prevNode.port.postMessage('terminate')
+      prevNode.disconnect()
+      prevNode = null // gc
+    }
+    audioWorkletNode.connect(audioContext.destination)
+    return audioWorkletNode
+  } else { // regular block dsp
+    const worker = new Worker('./worker.js', { type: 'module' })
+    return new Promise((resolve, reject) => {
+      plots.forEach(p => p.widget.clear())
+      plots = []
+      let resolved = false
+      worker.onmessage = async ({ data }) => {
+        // console.log('message', data)
+        if (data.fetch) {
+          const sample = samples[data.fetch] || (await audioContext.decodeAudioData(
+            await (await fetch(data.fetch.split('/').slice(1,-1).join('/') + '/' + encodeURIComponent(data.fetch.split('/').pop()))).arrayBuffer()
+          )).getChannelData(0) //'./samples/RAW_DDT_JAK_D.wav'
+          samples[data.fetch] = sample
+          worker.postMessage({ fetched: { url: data.fetch, sample }})
+        } else if (data.plot) {
+          const os = new Oscilloscope({ ...data.plot.opts, height: editor.defaultTextHeight() })
+          plots.push(data.plot)
+          data.plot.os = os
+          os.render(new Float32Array(data.plot.buffer))
+          os.event = () => {
+            plots.forEach(p => {
+              p.os.zoom = os.zoom
+              p.os.render()
+            })
+          }
+          const line = editor.getLineHandle(data.plot.pos.line)
+          os.el.style.left = editor.charCoords({ line: data.plot.pos.line, ch: line.text.length }).left + 2 + 'px'
+          data.plot.widget = editor.addLineWidget(data.plot.pos.line, os.el, { above: true, coverGutter: true })
+        } else {
+          const key = methodName
+          const syncTime = calcSyncTime(data)
+          if (prev[key]) {
+            if (!resolved) prev[key].worker.terminate()
+            prev[key].stop(syncTime)
+          }
+          const source = prev[key] = audioContext.createBufferSource()
+          source.n = data.n
+          source.worker = worker
+          source.loop = true
+          source.buffer = audioContext.createBuffer(1, data.blockFrames, audioContext.sampleRate)
+          source.buffer.getChannelData(0).set(new Float32Array(data.buffer))
+          source.connect(audioContext.destination)
+          source.start(syncTime)
 
-        if (!resolved) {
-          resolved = true
-          resolve({ data })
-        }
+          if (!resolved) {
+            resolved = true
+            resolve({ data })
+          }
 
-        // TODO: workaround for loops, remove this
-        if (key === 'loops') {
-          worker.terminate()
+          // TODO: workaround for loops, remove this
+          if (key === 'loops') {
+            worker.terminate()
+          }
         }
       }
-    }
-    worker.onerror = reject
-    worker.postMessage({ methodName, sampleRate: audioContext.sampleRate, n: prev[methodName] ? prev[methodName].n : 0 })
-  }) //.then(({ data }) => (worker.terminate(), data))
+      worker.onerror = reject
+      worker.postMessage({ methodName, sampleRate: audioContext.sampleRate, n: prev[methodName] ? prev[methodName].n : 0 })
+    }) //.then(({ data }) => (worker.terminate(), data))
+  }
 }
 
 function calcSyncTime (rendered) {
