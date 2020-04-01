@@ -32,7 +32,7 @@ export var live = async () => {
     return perc(
       t%(1/8), 10,
       lpf.cut(400 + perc(t%(1/4), 15, 300) + -lfo(3)*200).res(0.75).sat(3.5)
-      .update().run(chorder(t))) * .2 * (('57' in CC ? CC[57] : 127) / 127)
+      .update().run(chorder(t))) * 1 * (CC[57] / 127)
   }
 }
 </textarea>
