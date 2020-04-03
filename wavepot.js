@@ -173,7 +173,7 @@ async function renderBuffer (methodName) {
     audioWorkletNode.port.postMessage({ buffer: CC.buffer })
     if (prevNode) {
       prevNode.port.postMessage('terminate')
-      prevNode.disconnect()
+      // prevNode.disconnect()
       prevNode = null // gc
     }
     audioWorkletNode.connect(audioContext.destination)
