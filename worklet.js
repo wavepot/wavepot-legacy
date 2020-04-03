@@ -9,6 +9,7 @@ const beats = 4
 let fn = dsp['live'] || (() => (0))
 
 let n = 0
+let syncTime
 let flag = true
 let CC = new Int8Array(128).fill(0)
 
@@ -21,6 +22,8 @@ async function init () {
   class DSP extends AudioWorkletProcessor {
     constructor (options) {
       super(options)
+
+      syncTime = calcSyncTime()
 
       this.port.onmessage = e => {
         console.log(e)
@@ -35,11 +38,13 @@ async function init () {
     }
 
     process (inputs, outputs, parameters) {
-      let sample = 0
-      const channel = outputs[0][0]
-      for (let i = 0; i < channel.length; i++, n++) {
-        sample = fn(1 + n / settings.sampleRate, CC)
-        channel[i] = normalize(sample)
+      if (currentTime >= syncTime) {
+        let sample = 0
+        const channel = outputs[0][0]
+        for (let i = 0; i < channel.length; i++, n++) {
+          sample = fn(1 + n / settings.beatFrames, CC)
+          channel[i] = normalize(sample)
+        }
       }
       return flag
     }
@@ -47,6 +52,14 @@ async function init () {
 
   console.log('registering AudioWorkletProcessor: DSP')
   registerProcessor('DSP', DSP)
+}
+
+function calcSyncTime () {
+  return normalize(
+    currentTime +
+    (settings.blockTime -
+    (currentTime % (settings.blockTime)))
+  )
 }
 
 function normalize(number) {

@@ -22,6 +22,12 @@ import Chorder from './lib/chorder.js'
 import Moog from './lib/moogladder/index.js'
 import { Sin, Saw, Sqr, Tri } from './lib/wavetable-osc/index.js'
 import perc from './lib/perc.js'
+import { dsp as Kick } from './lib/kick.js'
+
+export var dsp = async () => {
+  var kick = await Kick()
+  return t => kick(t) * .8
+}
 
 export var live = async () => {
   var chorder = await Chorder({ scale: 'minor', osc: Saw, octave: 5, speed: 1/8 })
@@ -30,7 +36,7 @@ export var live = async () => {
 
   return (t, CC) => {
     return perc(
-      t%(1/8), 10,
+      t%(1/2), 30,
       lpf.cut(400 + perc(t%(1/4), 15, 300) + -lfo(3)*200).res(0.75).sat(3.5)
       .update().run(chorder(t))) * 1 * (CC[57] / 127)
   }
