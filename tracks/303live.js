@@ -22,15 +22,13 @@ var transpose = 12
 var osc = Saw(1024)
 var lfo = Sin(512)
 
-var Melody = [5, 25, 5, 25, 4, 16, 13, 4].map(function(n){
-  return note(n + transpose)
-})
+var Melody = [5, 25, 5, 25, 4, 16, 13, 4].map(n => note(n + transpose))
 
-export var dsp = async () => {
+export var beats = async () => {
   var kick = await Kick()
   var beats = await Beats({ images: [
     [2222,'base',4,0,2],
-    // [33,'highs',4,0,1],
+    // [33,'highs',4,0,1.2],
     // [44,'highs',4,0,1],
     // [33,'snare',2,0,1],
   ] })
@@ -49,7 +47,7 @@ export var live = async ({ res = 0.56, hpf = .0051, melody = Melody } = {}) => {
   return (t, CC) => {
     filter.cut(
       0.001 +
-      // 0.18 + 0.1 * lfo(1/2)
+      // 0.38 + 0.1 * lfo(1/2)
       0.02 + 0.4 * (CC[108] / 127)
     )
     filter.res(0.5 + 0.47 * (CC[127] / 127))
@@ -57,7 +55,7 @@ export var live = async ({ res = 0.56, hpf = .0051, melody = Melody } = {}) => {
     var n = slide(t, 1/8, 11, melody)
 
     var synth_osc = osc(n)
-    var synth = arp(t, 1/16, synth_osc, 120 - 100 * (CC[109] / 127), 7)
+    var synth = arp(t, 1/16, synth_osc, 120, 10)// - 100 * (CC[109] / 127), 7)
 
     synth = filter.run(synth * .5)
     synth = clip(synth * 12)

@@ -3,6 +3,8 @@ import MIDI from './lib/webmidi/index.js'
 import Oscilloscope from './lib/oscilloscope.js'
 // import './jazz-editor.js'
 
+let settings = {}
+
 let plots = []
 
 let canvas, canvasWorker
@@ -48,6 +50,7 @@ async function setup () {
         audioWorkletNode = null // gc
       }
       Object.keys(prev).forEach(key => {
+        if (key === 'live') return
         prev[key].stop()
         prev[key].worker.terminate()
       })
@@ -87,10 +90,14 @@ async function playScript (script) {
   if (!audioContext) {
     audioContext = window.audioContext = new AudioContext({ latencyHint: 'playback' })
     console.log(`start audio: ${audioContext.sampleRate}hz`)
+
+    await audioContext.audioWorklet.addModule('./clockworklet.js')
+    audioWorkletNode = new AudioWorkletNode(audioContext, `CLOCK`)
+    audioWorkletNode.connect(audioContext.destination)
   }
 
   // math
-  const settings = {
+  settings = {
     bpm: 125,
     sampleRate: audioContext.sampleRate
   }
@@ -141,8 +148,16 @@ async function playScript (script) {
   // stop immediately when commenting out what was previously playing
   Object.keys(prev).forEach(key => {
     if (!dspFunctions.includes(key)) {
-      console.log('stop:', key)
-      prev[key].stop()
+      if (key === 'live') {
+        audioWorkletNode.port.postMessage('terminate')
+        audioWorkletNode = null // gc
+        delete prev['live']
+        return
+      }
+      const syncTime = calcSyncTime(settings)
+      console.log('stop', key, 'at:', syncTime)
+      prev[key].worker.terminate()
+      prev[key].stop(syncTime)
       delete prev[key]
     }
   })
@@ -164,7 +179,7 @@ async function renderBuffer (methodName) {
   if (methodName === 'live') {
     console.log(`should load module worklet${audioWorkletProcessorId}.js`)
     await audioContext.audioWorklet.addModule(`./worklet${audioWorkletProcessorId}.js`)
-    let prevNode = audioWorkletNode
+    let prevNode = prev['live'] = audioWorkletNode
     // TODO: pass time parameter (n) to node
     // for proper alignment of waveforms
     // otherwise clicks will be audible
