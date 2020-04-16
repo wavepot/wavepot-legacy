@@ -19,6 +19,8 @@ let dspFunctions = []
 let prev = {}
 //TODO: ^^ improve this - merge dspFunctions/prev?
 
+let setupData = {}, setupCode = ''
+
 async function setup () {
   CC = await MIDI()
 
@@ -123,6 +125,14 @@ async function playScript (script) {
 
   localStorage.inited = "true"
 
+  if (exported.setup && setupCode !== exported.setup) {
+    console.log('running setup')
+    setupCode = exported.setup
+    setupData = await setupWorker()
+  }
+
+  delete exported.setup
+
   dspFunctions = []
   const actions = Object.entries(exported).map(async ([key, value]) => {
     switch (value) {
@@ -174,6 +184,25 @@ async function readExports () {
   }).then(({ data }) => (worker.terminate(), data))
 }
 
+async function setupWorker () {
+  const worker = new Worker('./setup-worker.js', { type: 'module' })
+  return new Promise((resolve, reject) => {
+    worker.onmessage = async ({ data }) => {
+      if (data.fetch) {
+        const uri = '.' === data.fetch[0]
+          ? data.fetch.split('/').slice(1,-1).join('/') + '/' + encodeURIComponent(data.fetch.split('/').pop())
+          : data.fetch
+        const sample = samples[data.fetch] || (await audioContext.decodeAudioData(await (await fetch(uri)).arrayBuffer())).getChannelData(0) //'./samples/RAW_DDT_JAK_D.wav'
+        samples[data.fetch] = sample
+        worker.postMessage({ fetched: { url: data.fetch, sample }})
+      } else {
+        resolve({ data })
+      }
+    }
+    worker.onerror = reject
+  }).then(({ data }) => (worker.terminate(), data))
+}
+
 async function renderBuffer (methodName) {
   // audioworklet dsp
   if (methodName === 'live') {
@@ -202,9 +231,10 @@ async function renderBuffer (methodName) {
       worker.onmessage = async ({ data }) => {
         // console.log('message', data)
         if (data.fetch) {
-          const sample = samples[data.fetch] || (await audioContext.decodeAudioData(
-            await (await fetch(data.fetch.split('/').slice(1,-1).join('/') + '/' + encodeURIComponent(data.fetch.split('/').pop()))).arrayBuffer()
-          )).getChannelData(0) //'./samples/RAW_DDT_JAK_D.wav'
+          const uri = '.' === data.fetch[0]
+            ? data.fetch.split('/').slice(1,-1).join('/') + '/' + encodeURIComponent(data.fetch.split('/').pop())
+            : data.fetch
+          const sample = samples[data.fetch] || (await audioContext.decodeAudioData(await (await fetch(uri)).arrayBuffer())).getChannelData(0) //'./samples/RAW_DDT_JAK_D.wav'
           samples[data.fetch] = sample
           worker.postMessage({ fetched: { url: data.fetch, sample }})
         } else if (data.plot) {
@@ -233,7 +263,7 @@ async function renderBuffer (methodName) {
           source.worker = worker
           source.loop = true
           source.buffer = audioContext.createBuffer(1, data.blockFrames, audioContext.sampleRate)
-          source.buffer.getChannelData(0).set(new Float32Array(data.buffer))
+          source.buffer.getChannelData(0).set(data.floats)
           source.connect(audioContext.destination)
           source.start(syncTime)
 
@@ -249,7 +279,12 @@ async function renderBuffer (methodName) {
         }
       }
       worker.onerror = reject
-      worker.postMessage({ methodName, sampleRate: audioContext.sampleRate, n: prev[methodName] ? prev[methodName].n : 0 })
+      worker.postMessage({
+        methodName,
+        setup: setupData,
+        sampleRate: audioContext.sampleRate,
+        n: prev[methodName] ? prev[methodName].n : 0
+      })
     }) //.then(({ data }) => (worker.terminate(), data))
   }
 }

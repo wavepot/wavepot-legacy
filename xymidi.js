@@ -13,6 +13,8 @@ XYContainer.ontouchstart =
 XYContainer.ontouchenter =
 XYContainer.ontouchmove =
 XYContainer.onmousemove = e => {
+  document.documentElement.webkitRequestFullScreen()
+
   e.stopPropagation();
   e.preventDefault();
 
