@@ -228,6 +228,7 @@ async function renderBuffer (methodName) {
       plots.forEach(p => p.widget.clear())
       plots = []
       let resolved = false
+      const timeStart = performance.now()
       worker.onmessage = async ({ data }) => {
         // console.log('message', data)
         if (data.fetch) {
@@ -253,6 +254,9 @@ async function renderBuffer (methodName) {
           data.plot.widget = editor.addLineWidget(data.plot.pos.line, os.el, { above: true, coverGutter: true })
         } else {
           const key = methodName
+          const timeElapsed = (performance.now() - timeStart) / 1000
+          const renderTime = prev[key] ? prev[key].renderTime : timeElapsed
+          const renderAverageTime = timeElapsed
           const syncTime = calcSyncTime(data)
           if (prev[key]) {
             if (!resolved) prev[key].worker.terminate()
@@ -266,6 +270,9 @@ async function renderBuffer (methodName) {
           source.buffer.getChannelData(0).set(data.floats)
           source.connect(audioContext.destination)
           source.start(syncTime)
+          source.syncTime = syncTime
+          source.renderTime = renderTime
+          source.renderAverageTime = renderAverageTime
 
           if (!resolved) {
             resolved = true
@@ -283,7 +290,13 @@ async function renderBuffer (methodName) {
         methodName,
         setup: setupData,
         sampleRate: audioContext.sampleRate,
-        n: prev[methodName] ? prev[methodName].n : 0
+        n: prev[methodName]
+          ? prev[methodName].n
+          + (audioContext.currentTime + prev[methodName].renderTime
+            > prev[methodName].syncTime + prev[methodName].renderAverageTime
+            ? settings.blockFrames
+            : 0)
+          : 0
       })
     }) //.then(({ data }) => (worker.terminate(), data))
   }
