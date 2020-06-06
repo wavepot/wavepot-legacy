@@ -2,7 +2,7 @@
 
 -=- work in progress -=-
 
-visit https://wavepot.surge.sh
+visit https://wavepot.com
 
 uses Chrome
 
